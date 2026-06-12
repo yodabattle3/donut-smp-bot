@@ -1,11 +1,33 @@
-// Ticket schema for support tickets
-export const ticketSchema = {
-  ticketId: String,
+import mongoose from 'mongoose';
+
+const ticketSchema = new mongoose.Schema({
+  ticketId: {
+    type: String,
+    required: true,
+    unique: true,
+  },
   channelId: String,
   userId: String,
   guildId: String,
-  createdAt: Date,
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  closedAt: Date,
   claimedBy: String,
-  status: String, // open, claimed, closed
-  blacklisted: Boolean,
-};
+  claimedAt: Date,
+  status: {
+    type: String,
+    enum: ['open', 'claimed', 'closed'],
+    default: 'open',
+  },
+  blacklisted: {
+    type: Boolean,
+    default: false,
+  },
+  reason: String,
+});
+
+ticketSchema.index({ guildId: 1, userId: 1 });
+
+export const Ticket = mongoose.model('Ticket', ticketSchema);

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { connectDatabase } from './utils/database.js';
 
 dotenv.config();
 
@@ -22,14 +23,23 @@ const client = new Client({
 client.commands = new Collection();
 client.cooldowns = new Collection();
 
+// Connect to MongoDB on startup
+await connectDatabase();
+
 // Load commands
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
-  const command = await import(`file://${filePath}`);
-  client.commands.set(command.data.name, command);
+  try {
+    const command = await import(`file://${filePath}`);
+    if (command.data && command.execute) {
+      client.commands.set(command.data.name, command);
+    }
+  } catch (error) {
+    console.error(`Error loading command ${file}:`, error);
+  }
 }
 
 // Load events
@@ -38,11 +48,17 @@ const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'
 
 for (const file of eventFiles) {
   const filePath = path.join(eventsPath, file);
-  const event = await import(`file://${filePath}`);
-  if (event.once) {
-    client.once(event.name, (...args) => event.execute(...args));
-  } else {
-    client.on(event.name, (...args) => event.execute(...args));
+  try {
+    const event = await import(`file://${filePath}`);
+    if (event.name && event.execute) {
+      if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args, client));
+      } else {
+        client.on(event.name, (...args) => event.execute(...args, client));
+      }
+    }
+  } catch (error) {
+    console.error(`Error loading event ${file}:`, error);
   }
 }
 
